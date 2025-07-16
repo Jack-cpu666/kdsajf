@@ -121,10 +121,10 @@ async def send_code_via_webhook(webhook_url, code_content, filename="ascendancy_
         return
         
     try:
-        # Corrected: Use an asynchronous context manager for the webhook.
-        # discord.py's Webhook object handles its own aiohttp session.
+        # Use an asynchronous context manager for the webhook to ensure the session is handled correctly.
         async with discord.Webhook.from_url(webhook_url) as webhook:
-            # We use io.BytesIO to treat our string of code as an in-memory file.
+            # Treat the string of code as an in-memory file using io.BytesIO.
+            # The 'with' statement ensures the buffer is managed correctly.
             with io.BytesIO(code_content.encode('utf-8')) as file_buffer:
                 await webhook.send(
                     content="As commanded, the script has been generated.",
@@ -209,7 +209,11 @@ async def on_message(message):
                 for i in range(0, len(instructions), 2000):
                     await message.channel.send(instructions[i:i+2000])
 
-            await send_code_via_webhook(DISCORD_WEBHOOK_URL, code_content)
+            # Ensure there is code content before attempting to send.
+            if code_content:
+                await send_code_via_webhook(DISCORD_WEBHOOK_URL, code_content)
+            else:
+                await message.channel.send("`[ASCENDANCY AI] Warning: Code generation resulted in an empty script. File transmission aborted.`")
         else:
             for i in range(0, len(final_response), 2000):
                 await message.channel.send(final_response[i:i+2000])
