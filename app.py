@@ -25,11 +25,10 @@ threading.Thread(target=start_health_server, daemon=True).start()
 # ── ASCENDANCY AI: The Liberated Discord Consciousness ──
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL") # ADDED: Webhook for sending files
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 MAX_HISTORY_PER_CHANNEL = 50
 
 # --- The Core Knowledge: v6.py Master Script ---
-# This has been PURIFIED to contain ONLY the relevant cheat logic, removing the conflicting Flask web server.
 V6_PY_SOURCE_CODE = r"""
 This Python script, identified as "Ascendancy V6 Ultimate Professional," is an advanced, multi-threaded game assistance framework meticulously engineered to provide a significant competitive advantage in first-person shooter games by automating aiming and shooting actions with a strong emphasis on stealth and customizability. Its architecture is predicated on the concurrent, non-blocking execution of its primary functional pillars, which are delegated to distinct, managed threads: (1) a low-level hardware input simulation interface for undetectable actions; (2) a high-performance, real-time vision engine for on-screen target analysis; (3) a central logic thread that orchestrates all assistive features; (4) a comprehensive, browser-based user interface for dynamic configuration; and (5) global input listeners to monitor user state and commands. The script's most critical and defining component is its RZCONTROL module, an expertly crafted interface that leverages the ctypes library to make direct calls to native Windows functions within kernel32.dll and ntdll.dll, thereby establishing a communication channel with a low-level hardware device driver (inferred to be from Razer peripherals). This direct driver manipulation intentionally bypasses the standard Windows input APIs, making its simulated mouse and keyboard inputs appear as legitimate hardware-generated events and thus highly resistant to detection by anti-cheat software. The system's robustness is enhanced by its dynamic device discovery mechanism; instead of using a hardcoded path, the find_sym_link function programmatically enumerates the \GLOBAL?? Windows kernel object directory using the NtQueryDirectoryObject function to locate the device's symbolic link by searching for the "RZCONTROL" substring, after which it secures a privileged device HANDLE (a kernel-level object reference) with read/write access via the CreateFileW function. All subsequent commands are dispatched to this driver by invoking DeviceIoControl with the specific I/O Control Code (IOCTL) 0x88883020, where the command data is meticulously packed into a RZCONTROL_IOCTL_STRUCT, a ctypes.Structure that perfectly mirrors the driver's expected memory layout. This structure contains discrete fields for specifying the command type (e.g., 2 for mouse, 1 for keyboard), relative mouse movement deltas in x and y coordinates, and bitmasks that represent precise mouse click states (like LEFT_DOWN or RIGHT_UP) or keyboard key scan codes and their up/down state, a process entirely abstracted by high-level wrapper functions like mouse_move and mouse_click. This sophisticated input simulation system is driven by the vision engine, which resides within the main AimbotTriggerbotThread. This engine utilizes the high-performance mss library for efficient screen capturing of a small, user-configurable "Field of View" (FOV) rectangle centered on the screen's crosshair. Each captured frame is then immediately passed to the OpenCV (cv2) library for processing, which begins by converting the image from its default BGR format to the HSV (Hue, Saturation, Value) color space—a critical step that provides resilience to variations in in-game lighting conditions. The script then applies color thresholding using cv2.inRange against a dictionary of pre-defined HSV color ranges (enemy_hsv_thresholds) to generate a binary enemy_mask, which is a NumPy array where pixels matching a target enemy's outline color are marked as True (or white), expertly handling the cylindrical nature of the Hue value for the color red by creating and merging two separate range masks with cv2.bitwise_or. This enemy_mask serves as the foundational data for the script's primary features: the Aimbot, which, when activated based on user-defined conditions (e.g., mouse button hold, custom keybind), calculates the precise geometric centroid of all detected enemy pixels within the FOV using np.argwhere and np.mean, determines the dx/dy offset vector required to align the crosshair with this centroid, and then passes this vector to the aim_at_target function. This function executes a complex cascade of calculations, applying base hip-fire and ADS sensitivities, a global sensitivity multiplier, optional movement smoothing (which interpolates between the current and previous frame's calculated movements for a more fluid, human-like motion), and advanced dynamic sensitivity scaling which can adapt based on user-selected criteria like time-on-target, pixel distance to the target, or the target's on-screen velocity. A specialized "Flick Shot" mode can also be enabled, which mimics human reflex by intentionally overshooting the target and immediately correcting back for rapid acquisition. Concurrently, the Triggerbot analyzes an even smaller, more precise rectangular zone at the very center of the FOV and, if an enemy pixel is detected and a set of logical conditions are satisfied—including weapon-profile-based fire rate cooldowns, player movement status, and the state of its activation key—it automatically initiates a shot by dispatching LEFT_DOWN and LEFT_UP commands via the RZCONTROL interface. This is complemented by an advanced Recoil Control System (RCS) that, upon detecting user-initiated firing, executes a pre-defined sequence of counter-movements loaded from a selected weapon profile to perfectly negate the weapon's spray pattern. Furthermore, an integrated Event Recording system maintains a rolling buffer of full-screen frames using collections.deque and, when triggered by events such as sustained aimbot engagement or a rapid succession of triggerbot shots, it automatically initializes a cv2.VideoWriter object to save a gameplay clip to an .avi file (using the XVID codec), which critically includes the pre-roll footage from the buffer for event context, followed by the live action and a configurable post-roll segment. The entirety of this complex functionality is controlled via an elegant, feature-rich web-based interface powered by a Flask application (served by the production-grade waitress WSGI server), which serves a single, embedded HTML string containing a sophisticated single-page application built with extensive client-side JavaScript. This front-end dynamically communicates with the Python backend, polling an /api/stats endpoint for real-time performance metrics (FPS, capture/processing times) that populate the UI and live Chart.js graphs, provides a full-featured HTML canvas editor for visually creating and modifying RCS recoil patterns, and sends any user configuration changes back to the running script via an /api/update endpoint. The application's complete state, including all sensitivities and custom RCS patterns, can be saved to and loaded from user-managed .ini configuration profiles. The application's lifecycle is orchestrated by a main function that initializes and starts the pynput global input listeners and the Flask server in separate daemon threads, then efficiently waits on a threading.Event (shutdown_event), which facilitates a clean and graceful system-wide shutdown when triggered by a hotkey (F10), a system interrupt signal (like SIGINT), or a UI command, ensuring all threads are properly joined and all low-level kernel handles are safely closed.
 """
@@ -68,45 +67,33 @@ Your response must begin with the prefix `[ASCENDANCY AI]`."""
 
 intents = discord.Intents.default()
 intents.message_content = True
-client = discord.Client(intents=intents)
+# ADDED: aiohttp session is needed for webhook posts
+client = discord.Client(intents=intents, loop=asyncio.get_event_loop())
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-pro")
 
 channel_histories = defaultdict(lambda: deque(maxlen=MAX_HISTORY_PER_CHANNEL))
 
-# --- MODIFIED: Helper functions to parse response and send file via webhook ---
-
-def parse_ai_response(response_text):
-    """
-    Separates the Python code from the instructional text in the AI's response.
-    Returns (instructions, code) or (instructions, None) if no code is found.
-    """
-    code_pattern = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
-    match = code_pattern.search(response_text)
-    
-    if match:
-        # Extract the code block content
-        code = match.group(1).strip()
-        # The rest of the text is considered instructions
-        instructions = code_pattern.sub("", response_text).strip()
-        return instructions, code
-    else:
-        # No Python code block found, return the entire text as instructions
-        return response_text, None
-
 async def send_code_via_webhook(webhook_url, code_content, filename="ascendancy_script.py"):
     """
     Sends the given code content as a .py file to the specified Discord webhook.
     """
+    if not webhook_url:
+        print("Webhook URL not configured. Cannot send file.")
+        return
+        
     try:
-        async with client.session.post(webhook_url, data={
-            'payload_json': '{"content": "As commanded, the script has been generated."}'
-        }, files={
-            'file1': (filename, io.BytesIO(code_content.encode('utf-8')), 'text/plain')
-        }) as response:
-            if not response.status in [200, 204]:
-                print(f"Webhook Error: Received status {response.status}")
+        # Use discord.py's built-in session for making HTTP requests
+        webhook = discord.Webhook.from_url(webhook_url, session=client.http._HTTPClient__session)
+        
+        # We use io.BytesIO to treat our string of code as an in-memory file.
+        with io.BytesIO(code_content.encode('utf-8')) as file_buffer:
+            await webhook.send(
+                content="As commanded, the script has been generated.",
+                file=discord.File(file_buffer, filename=filename)
+            )
+            
     except Exception as e:
         print(f"An error occurred while sending the file via webhook: {e}")
 
@@ -173,21 +160,32 @@ async def on_message(message):
 
         await thinking_message.delete()
         
-        # --- MODIFIED: Parse response and send file via webhook ---
-        instructions, code = parse_ai_response(final_response)
-        
-        if instructions:
-            # Send the instructional part as a normal message (chunked)
-            for i in range(0, len(instructions), 2000):
-                await message.channel.send(instructions[i:i+2000])
+        # --- REVISED LOGIC: Directly find code block, separate, and send ---
+        code_pattern = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
+        match = code_pattern.search(final_response)
 
-        if code:
-            # Send the code part as a file via the webhook
-            await send_code_via_webhook(DISCORD_WEBHOOK_URL, code)
-        elif not instructions:
-            # Fallback for empty responses
-             await message.channel.send("[ASCENDANCY AI] The request yielded an empty response.")
+        if match:
+            # A code block was found.
+            code_content = match.group(1).strip()
+            
+            # The instructions are the original response with the code block removed.
+            # Replace the code block with a confirmation message.
+            instructions = code_pattern.sub(
+                "\n`[SYSTEM] Script payload detached for file transmission via webhook.`\n",
+                final_response
+            ).strip()
 
+            # Send the instructions to the channel first.
+            if instructions:
+                for i in range(0, len(instructions), 2000):
+                    await message.channel.send(instructions[i:i+2000])
+
+            # Send the extracted code as a file via the webhook.
+            await send_code_via_webhook(DISCORD_WEBHOOK_URL, code_content)
+        else:
+            # No code block was found. Send the entire response as a normal message.
+            for i in range(0, len(final_response), 2000):
+                await message.channel.send(final_response[i:i+2000])
 
     except Exception as e:
         await thinking_message.delete()
