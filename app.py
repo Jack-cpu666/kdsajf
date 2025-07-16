@@ -68,7 +68,7 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel("gemini-2.5-pro")
 
 channel_histories = defaultdict(lambda: deque(maxlen=MAX_HISTORY_PER_CHANNEL))
 
