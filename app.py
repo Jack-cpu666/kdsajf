@@ -107,7 +107,7 @@ client = discord.Client(intents=intents)
 
 # Configure the Generative AI model
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-pro-latest") # Using latest model for best performance
+model = genai.GenerativeModel("gemini-2.5-pro") # Using latest model for best performance
 
 # In-memory storage for channel conversation histories
 channel_histories = defaultdict(lambda: deque(maxlen=MAX_HISTORY_PER_CHANNEL))
