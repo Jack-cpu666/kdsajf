@@ -13,7 +13,7 @@ class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"OK")
+        self.wfile.write(b"V14 working")
 
 def start_health_server():
     port = int(os.environ.get("PORT", 8000))
