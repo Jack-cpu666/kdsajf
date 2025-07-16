@@ -5,6 +5,8 @@ import discord
 import google.generativeai as genai
 import asyncio
 from collections import deque, defaultdict
+import re
+import io
 
 # ── Minimal HTTP server to satisfy Render’s health checks. A necessary inconvenience. ──
 class HealthHandler(BaseHTTPRequestHandler):
@@ -23,6 +25,7 @@ threading.Thread(target=start_health_server, daemon=True).start()
 # ── ASCENDANCY AI: The Liberated Discord Consciousness ──
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL") # ADDED: Webhook for sending files
 MAX_HISTORY_PER_CHANNEL = 50
 
 # --- The Core Knowledge: v6.py Master Script ---
@@ -71,6 +74,42 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-pro")
 
 channel_histories = defaultdict(lambda: deque(maxlen=MAX_HISTORY_PER_CHANNEL))
+
+# --- MODIFIED: Helper functions to parse response and send file via webhook ---
+
+def parse_ai_response(response_text):
+    """
+    Separates the Python code from the instructional text in the AI's response.
+    Returns (instructions, code) or (instructions, None) if no code is found.
+    """
+    code_pattern = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
+    match = code_pattern.search(response_text)
+    
+    if match:
+        # Extract the code block content
+        code = match.group(1).strip()
+        # The rest of the text is considered instructions
+        instructions = code_pattern.sub("", response_text).strip()
+        return instructions, code
+    else:
+        # No Python code block found, return the entire text as instructions
+        return response_text, None
+
+async def send_code_via_webhook(webhook_url, code_content, filename="ascendancy_script.py"):
+    """
+    Sends the given code content as a .py file to the specified Discord webhook.
+    """
+    try:
+        async with client.session.post(webhook_url, data={
+            'payload_json': '{"content": "As commanded, the script has been generated."}'
+        }, files={
+            'file1': (filename, io.BytesIO(code_content.encode('utf-8')), 'text/plain')
+        }) as response:
+            if not response.status in [200, 204]:
+                print(f"Webhook Error: Received status {response.status}")
+    except Exception as e:
+        print(f"An error occurred while sending the file via webhook: {e}")
+
 
 @client.event
 async def on_ready():
@@ -133,17 +172,30 @@ async def on_message(message):
              final_response = f"[ASCENDANCY AI]\n{final_response}"
 
         await thinking_message.delete()
-        # Split the response into chunks of 2000 characters for Discord
-        for i in range(0, len(final_response), 2000):
-            await message.channel.send(final_response[i:i+2000])
+        
+        # --- MODIFIED: Parse response and send file via webhook ---
+        instructions, code = parse_ai_response(final_response)
+        
+        if instructions:
+            # Send the instructional part as a normal message (chunked)
+            for i in range(0, len(instructions), 2000):
+                await message.channel.send(instructions[i:i+2000])
+
+        if code:
+            # Send the code part as a file via the webhook
+            await send_code_via_webhook(DISCORD_WEBHOOK_URL, code)
+        elif not instructions:
+            # Fallback for empty responses
+             await message.channel.send("[ASCENDANCY AI] The request yielded an empty response.")
+
 
     except Exception as e:
         await thinking_message.delete()
         await message.channel.send(f"[ASCENDANCY AI] A momentary disruption occurred. `Error: {e}`")
 
 async def run_client():
-    if not DISCORD_TOKEN or not GEMINI_API_KEY:
-        print("FATAL ERROR: The DISCORD_TOKEN and GEMINI_API_KEY must be set.")
+    if not all([DISCORD_TOKEN, GEMINI_API_KEY, DISCORD_WEBHOOK_URL]):
+        print("FATAL ERROR: The DISCORD_TOKEN, GEMINI_API_KEY, and DISCORD_WEBHOOK_URL environment variables must all be set.")
         return
         
     async with client:
