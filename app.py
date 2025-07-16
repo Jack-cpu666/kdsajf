@@ -16,7 +16,6 @@ client = discord.Client(intents=intents)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-pro")
 
-
 async def init_db():
     db = await aiosqlite.connect(DB_PATH)
     await db.execute(
@@ -26,12 +25,10 @@ async def init_db():
     await db.commit()
     return db
 
-
 @client.event
 async def on_ready():
     client.db = await init_db()
     print(f"Logged in as {client.user}")
-
 
 @client.event
 async def on_message(message):
@@ -71,7 +68,6 @@ async def on_message(message):
         await message.channel.send(text[:2000])
     except Exception as e:
         await message.channel.send(f"⚠️ Error: {e}")
-
 
 async def main():
     await client.start(DISCORD_TOKEN)
