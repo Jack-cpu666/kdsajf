@@ -52,7 +52,7 @@ intents.message_content = True
 client = discord.Client(intents=intents, loop=asyncio.get_event_loop())
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.0-pro")
+model = genai.GenerativeModel("gemini-2.5-pro")
 
 channel_histories = defaultdict(lambda: deque(maxlen=MAX_HISTORY_PER_CHANNEL))
 
