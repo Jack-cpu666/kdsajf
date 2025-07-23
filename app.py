@@ -63,6 +63,28 @@ class HelpBot(commands.Bot):
             )
         )
 
+    async def on_message(self, message: discord.Message):
+        """
+        This event is triggered for every message the bot can see.
+        We use it to guide users who mention the bot.
+        """
+        # Ignore messages sent by the bot itself to prevent loops.
+        if message.author == self.user:
+            return
+
+        # NEW FEATURE: Check if the bot was mentioned without a command.
+        if self.user.mentioned_in(message) and not message.content.startswith(BOT_PREFIX):
+            help_embed = discord.Embed(
+                title=f"👋 Hello, {message.author.display_name}!",
+                description=f"It looks like you have a question. I'm a bot with a specific set of commands designed to help you.\n\nPlease start by using the `{BOT_PREFIX}help` command to see everything I can do!",
+                color=discord.Color.purple()
+            )
+            await message.channel.send(embed=help_embed)
+            return # Stop further processing for this message.
+
+        # Process actual commands. This is crucial!
+        await self.process_commands(message)
+
     async def on_command_error(self, ctx: commands.Context, error: Exception):
         """Global handler for command errors."""
         if isinstance(error, commands.CommandNotFound):
@@ -77,7 +99,7 @@ class HelpBot(commands.Bot):
 bot = HelpBot()
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  सेक्शन: सामान्य कमांड (General Commands)
+#  General Commands
 # ═══════════════════════════════════════════════════════════════════════════
 
 @bot.command(name='help')
@@ -247,11 +269,11 @@ async def overlay_guide(ctx: commands.Context):
 async def how_it_works(ctx: commands.Context, role: str = None):
     """Explains how the platform works for streamers or viewers."""
     if role and role.lower() == 'streamer':
-        await setup_guide(ctx) # Call the detailed streamer setup guide
+        await setup_guide.callback(ctx) # Use .callback() to properly invoke the command
         return
     
-    if role is None or role.lower() != 'viewer':
-        # Default to the viewer guide if no role or an invalid role is provided
+    # Default to viewer if role is 'viewer' or not specified
+    if role is None or role.lower() == 'viewer':
         embed = discord.Embed(
             title="🎤 How It Works for Viewers",
             color=discord.Color.red()
@@ -262,6 +284,9 @@ async def how_it_works(ctx: commands.Context, role: str = None):
         embed.add_field(name="4. Tip for Priority (Optional)", value="Want your song played sooner? Add a tip! Higher tips move your song up the queue.", inline=False)
         embed.add_field(name="5. Watch and Listen", value="See your request on the streamer's overlay and enjoy!", inline=False)
         await ctx.send(embed=embed)
+    else:
+        await ctx.send(f"Invalid role. Please use `{BOT_PREFIX}howitworks streamer` or `{BOT_PREFIX}howitworks viewer`.")
+
 
 @bot.command(name='tipping')
 async def tipping_info(ctx: commands.Context):
@@ -305,8 +330,9 @@ async def promoter_program(ctx: commands.Context):
     embed.add_field(name="Example Scenario", value="Let's say you recruit **100** streamers, and each earns **$100 per day**.\nTotal Daily Revenue: `100 * $100 = $10,000`\nYour Commission: `$10,000 * 5% = $500`\nThat's **$500 per day** in passive income for you!", inline=False)
     await ctx.send(embed=embed)
 
+# FIX: Corrected commands.comntexts to commands.Context
 @bot.command(name='referral')
-async def referral_info(ctx: commands.comntexts):
+async def referral_info(ctx: commands.Context):
     """Explains how to use the referral system."""
     embed = discord.Embed(
         title="🔗 How Referrals Work",
