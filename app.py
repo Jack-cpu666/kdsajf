@@ -16,7 +16,7 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "YOUR_DISCORD_BOT_TOKEN_HERE")
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
 
 # Your website's base URL and name.
-WEBSITE_URL = "https://songreq.onrender.com"
+WEBSITE_URL = "https://streambeatz.com"
 WEBSITE_NAME = "streambeatz"
 
 # Logging Configuration
